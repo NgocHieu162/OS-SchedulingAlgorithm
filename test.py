@@ -78,7 +78,7 @@ def AddingProcess(queue, time, ReEnterProcess = None):
                 queue.put(p)
                 queue_list.append(p)
               
-def rProcess(queue, time):
+def rProcess(time):
     global R1, R2
     ReEnterProcess = []
     ReEnterTime = None
@@ -87,9 +87,11 @@ def rProcess(queue, time):
         if r1_process[0].IO_time != 0:
             r1_process[1] -= 1 # thời gian IO giảm 1
             R1_process.append(r1_process[0].ID)
+            
             if r1_process[1] == 0:
                 r1_process = R1.get()[0]
                 if r1_process.CPU2 > 0:
+                    r1_process.remaining_time = r1_process.CPU2
                     ReEnterProcess.append(r1_process)
                     ReEnterTime = time + 1
                 r1_process.IO_time -= 1
@@ -102,15 +104,17 @@ def rProcess(queue, time):
         if r2_process[0].IO_time != 0:
             r2_process[1] -= 1 # thời gian IO giảm 1
             R2_process.append(r2_process[0].ID)
+            
             if r2_process[1] == 0:
                 r2_process = R2.get()[0]
                 if r2_process.CPU2 > 0:
-                    ReEnterProcess.append(r1_process)
+                    r2_process.remaining_time = r2_process.CPU2
+                    ReEnterProcess.append(r2_process)
                     ReEnterTime = time + 1
                 r2_process.IO_time -= 1
         else: R2.get()
     else: 
-        R2_process.append("_")
+        R2_process.append("_")    
         
     return ReEnterProcess, ReEnterTime
     
@@ -120,7 +124,7 @@ def fcfs(process_list, np):
 
 
 ##### RoundRobin
-def execute_cpu_burst(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnterProcess, ReEnterTime):
+def executeCPU_RR(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnterProcess, ReEnterTime):
     CPU = getattr(curr_Process, cpu_attr)
     temp = min(CPU, quantum_time)
 
@@ -130,7 +134,7 @@ def execute_cpu_burst(q, time, curr_Process, quantum_time, cpu_attr, io_attr, Re
             AddingProcess(q, time, ReEnterProcess)
         elif i != temp - 1: AddingProcess(q, time)
         if i != temp - 1:
-            ReEnterProcess, ReEnterTime = rProcess(q, time)
+            ReEnterProcess, ReEnterTime = rProcess(time)
             
     
     curr_Process.burst_time += temp
@@ -157,14 +161,14 @@ def roundRobin(quantum_time, np):
     completed = 0
     q = Queue()
     while completed < np or not R1.empty() or not R2.empty():
-        ReEnterProcess, ReEnterTime = rProcess(q, time)
+        ReEnterProcess, ReEnterTime = rProcess(time)
         AddingProcess(q, time)
         if not q.empty():
             curr_Process = q.get()
             if curr_Process.CPU1 > 0:
-                temp = execute_cpu_burst(q, time, curr_Process, quantum_time, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
+                temp = executeCPU_RR(q, time, curr_Process, quantum_time, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
             elif curr_Process.CPU2 > 0:
-                temp = execute_cpu_burst(q, time, curr_Process, quantum_time, "CPU2", "IO2", ReEnterProcess, ReEnterTime)
+                temp = executeCPU_RR(q, time, curr_Process, quantum_time, "CPU2", "IO2", ReEnterProcess, ReEnterTime)
             time += temp   
             
             if curr_Process.CPU1 == -1 and curr_Process.CPU2 == -1: #nếu xong
@@ -178,13 +182,12 @@ def roundRobin(quantum_time, np):
             
     calcTime(np)
 #################
-    
-            
+             
 def sjf(process_list, np):
     print()
 
 ####### SRTN
-def PQAddingProcess(pqueue, time, ReEnterProcess = None):
+def AddingProcessSRTN(pqueue, time, ReEnterProcess = None):
     enterRQ_list = []
     pqueue_list = list(pqueue.queue)
     for p in process_list:
@@ -200,83 +203,44 @@ def PQAddingProcess(pqueue, time, ReEnterProcess = None):
         for process in enterRQ_list:
             if not any(p[1] == process for p in pqueue_list):
                 pqueue.put((process.remaining_time, process))       
-                 
-def rProcessSRTN(pqueue, time):
-    global R1, R2
-    ReEnterProcess = []
-    ReEnterTime = None
-    if not R1.empty():
-        r1_process = R1.queue[0]
-        if r1_process[0].IO_time != 0:
-            r1_process[1] -= 1 # thời gian IO giảm 1
-            R1_process.append(r1_process[0].ID)
-            
-            if r1_process[1] == 0:
-                r1_process = R1.get()[0]
-                if r1_process.CPU2 > 0:
-                    r1_process.remaining_time = r1_process.CPU2
-                    ReEnterProcess.append(r1_process)
-                    ReEnterTime = time + 1
-                r1_process.IO_time -= 1
-        else: R1.get()
-    else: 
-        R1_process.append("_")
-    
-    if not R2.empty():
-        r2_process = R2.queue[0]
-        if r2_process[0].IO_time != 0:
-            r2_process[1] -= 1 # thời gian IO giảm 1
-            R2_process.append(r2_process[0].ID)
-            if r2_process[1] == 0:
-                r2_process = R2.get()[0]
-                if r2_process.CPU2 > 0:
-                    r2_process.remaining_time = r2_process.CPU2
-                    ReEnterProcess.append(r2_process)
-                    ReEnterTime = time + 1
-                r2_process.IO_time -= 1
-        else: R2.get()
-    else: 
-        R2_process.append("_")    
-        
-    return ReEnterProcess, ReEnterTime
-
-def SRTNexecute_cpu_burst(pq, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, ReEnterTime):
+                
+def executeCPU_SRTN(pq, time, curr_Process, cpu_attr, io_attr):
     curr_Process.burst_time += 1
     setattr(curr_Process, cpu_attr, getattr(curr_Process, cpu_attr) - 1)
     curr_Process.remaining_time = getattr(curr_Process, cpu_attr) - 1
     curr_Process.last_executed_time = time + 1
     
     if getattr(curr_Process, cpu_attr) == 0:
-        if getattr(curr_Process, io_attr) != "-1":
-            io1 = int(curr_Process.IO1.split("(")[0])
-            if curr_Process.IO1[-2] == '1':
-                R1.put([curr_Process, io1])
-            else: R2.put([curr_Process, io1])
+        io_data = getattr(curr_Process, io_attr)
+        if io_data != "-1":
+            io_time = int(io_data.split("(")[0])
+            if io_data[-2] == '1':
+                R1.put([curr_Process, io_time])
+            else:
+                R2.put([curr_Process, io_time])
         # Đánh dấu xem tiến trình hiện tại có IO lần đầu tiên hay chưa
         setattr(curr_Process, cpu_attr, -1)
-    else: PQAddingProcess(pq, time, [curr_Process])
+    else: AddingProcessSRTN(pq, time, [curr_Process])
     
 def srtn(np):
     global R1, R2, scheduling_process
     time = 0
     completed = 0
     pq = PriorityQueue()
-    while True:
-        ReEnterProcess , ReEnterTime = rProcessSRTN(pq, time)
-        PQAddingProcess(pq, time)
+    while completed < np or not R1.empty() or not R2.empty():
+        ReEnterProcess , ReEnterTime = rProcess(time)
+        AddingProcessSRTN(pq, time)
         if not pq.empty():
             _, curr_Process = pq.get()
             if curr_Process.CPU1 > 0:
-                SRTNexecute_cpu_burst(pq, time, curr_Process, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
-                time += 1
-                if ReEnterProcess and time == ReEnterTime:
-                    PQAddingProcess(pq, time, ReEnterProcess)
+                executeCPU_SRTN(pq, time, curr_Process, "CPU1", "IO1")
             elif curr_Process.CPU2 > 0:
-                SRTNexecute_cpu_burst(pq, time, curr_Process, "CPU2", "IO2", ReEnterProcess, ReEnterTime)
-                time += 1
-                if ReEnterProcess and time == ReEnterTime:
-                    PQAddingProcess(pq, time, ReEnterProcess)
-                
+                executeCPU_SRTN(pq, time, curr_Process, "CPU2", "IO2")
+
+            time += 1
+            if ReEnterProcess and time == ReEnterTime:
+                AddingProcessSRTN(pq, time, ReEnterProcess) 
+ 
             if curr_Process.CPU1 == -1 and curr_Process.CPU2 == -1: #nếu xong
                 completed += 1
             
@@ -285,9 +249,8 @@ def srtn(np):
             scheduling_process.append("_")  # Nếu hiện tại không có quá trình nào thì append _
             time += 1 
             if ReEnterProcess and time == ReEnterTime:
-                PQAddingProcess(pq, time, ReEnterProcess)
+                AddingProcessSRTN(pq, time, ReEnterProcess)
             
-        if completed == np and R1.empty() and R2.empty(): break
     calcTime(np)
 #################   
     
