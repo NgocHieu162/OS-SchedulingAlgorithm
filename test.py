@@ -18,6 +18,7 @@ class Process:
     burst_time: int
     IO_time: int
     remaining_time: int
+    completion_time: int
     
     def __lt__(self, other):
         return (self.remaining_time, self.last_executed_time, self.ID) < (other.remaining_time, other.last_executed_time, other.ID)
@@ -53,7 +54,7 @@ def read_file(input):
                 IO2 = temp[4]
                 IO_time += 1
             else: IO2 = "-1"
-            process_list.append(Process(i + 1, AT, CPU1, IO1, CPU2, IO2, 0, 0, IO_time, CPU1))
+            process_list.append(Process(i + 1, AT, CPU1, IO1, CPU2, IO2, 0, 0, IO_time, CPU1, 0))
                                                                                         #first remaning_time = CPU1
     return algorithm, quantum_time, np
 
@@ -90,6 +91,7 @@ def rProcess(time):
             
             if r1_process[1] == 0:
                 r1_process = R1.get()[0]
+                r1_process.completion_time = time + 1
                 if r1_process.CPU2 > 0:
                     r1_process.remaining_time = r1_process.CPU2
                     ReEnterProcess.append(r1_process)
@@ -107,6 +109,7 @@ def rProcess(time):
             
             if r2_process[1] == 0:
                 r2_process = R2.get()[0]
+                r2_process.completion_time = time + 1
                 if r2_process.CPU2 > 0:
                     r2_process.remaining_time = r2_process.CPU2
                     ReEnterProcess.append(r2_process)
@@ -134,11 +137,13 @@ def executeCPU_RR(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnte
             AddingProcess(q, time, ReEnterProcess)
         elif i != temp - 1: AddingProcess(q, time)
         if i != temp - 1:
+            calcWT_Queue(q)
             ReEnterProcess, ReEnterTime = rProcess(time)
             
     
     curr_Process.burst_time += temp
     curr_Process.last_executed_time = time
+    
     setattr(curr_Process, cpu_attr, CPU - temp)
 
     if getattr(curr_Process, cpu_attr) == 0:
@@ -149,6 +154,7 @@ def executeCPU_RR(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnte
                 R1.put([curr_Process, io_time])
             else:
                 R2.put([curr_Process, io_time])
+        else: curr_Process.completion_time = time
         setattr(curr_Process, cpu_attr, -1)  # Đánh dấu là đã xong
     else:
         AddingProcess(q, time, [curr_Process])
@@ -165,6 +171,7 @@ def roundRobin(quantum_time, np):
         AddingProcess(q, time)
         if not q.empty():
             curr_Process = q.get()
+            calcWT_Queue(q)
             if curr_Process.CPU1 > 0:
                 temp = executeCPU_RR(q, time, curr_Process, quantum_time, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
             elif curr_Process.CPU2 > 0:
@@ -180,7 +187,7 @@ def roundRobin(quantum_time, np):
             if ReEnterProcess is not None and time == ReEnterTime:
                 AddingProcess(q, time, ReEnterProcess)
             
-    calcTime(np)
+    calcTT(np)
 #################
              
 def sjf(process_list, np):
@@ -208,7 +215,8 @@ def executeCPU_SRTN(pq, time, curr_Process, cpu_attr, io_attr):
     curr_Process.burst_time += 1
     setattr(curr_Process, cpu_attr, getattr(curr_Process, cpu_attr) - 1)
     curr_Process.remaining_time = getattr(curr_Process, cpu_attr) - 1
-    curr_Process.last_executed_time = time + 1
+    time += 1
+    curr_Process.last_executed_time = time
     
     if getattr(curr_Process, cpu_attr) == 0:
         io_data = getattr(curr_Process, io_attr)
@@ -218,6 +226,7 @@ def executeCPU_SRTN(pq, time, curr_Process, cpu_attr, io_attr):
                 R1.put([curr_Process, io_time])
             else:
                 R2.put([curr_Process, io_time])
+        else: curr_Process.completion_time = time
         # Đánh dấu xem tiến trình hiện tại có IO lần đầu tiên hay chưa
         setattr(curr_Process, cpu_attr, -1)
     else: AddingProcessSRTN(pq, time, [curr_Process])
@@ -232,6 +241,7 @@ def srtn(np):
         AddingProcessSRTN(pq, time)
         if not pq.empty():
             _, curr_Process = pq.get()
+            calcWT_PQueue(pq)
             if curr_Process.CPU1 > 0:
                 executeCPU_SRTN(pq, time, curr_Process, "CPU1", "IO1")
             elif curr_Process.CPU2 > 0:
@@ -251,27 +261,25 @@ def srtn(np):
             if ReEnterProcess and time == ReEnterTime:
                 AddingProcessSRTN(pq, time, ReEnterProcess)
             
-    calcTime(np)
+    calcTT(np)
 #################   
     
-def calcTime(np):
-    global TT, WT
-    completion_time = {}
-    total_time = len(scheduling_process)
+def calcTT(np):
+    global TT 
     for i in range(np):
-        reversed_list = scheduling_process[::-1]
-        for j in range(len(reversed_list)):
-            if reversed_list[j] == str(i + 1):
-                completion_time[i] = total_time - j
-                break
-    
-    # print(completion_time)
-    # for i in range(np):
-    #     print(process_list[i].AT)
+        TT[i] = process_list[i].completion_time - process_list[i].AT
+
+def calcWT_Queue(q):
+    global WT
+    queue_list = list(q.queue)
+    for p in queue_list:
+        WT[p.ID - 1] += 1
         
-    for i in range(np):
-        TT[i] = completion_time[i] - process_list[i].AT
-        WT[i] = TT[i] - process_list[i].burst_time
+def calcWT_PQueue(pq):
+    global WT
+    queue_list = list(pq.queue)
+    for p in queue_list:
+        WT[p[1].ID - 1] += 1
         
         
 def write_file(output, np):
