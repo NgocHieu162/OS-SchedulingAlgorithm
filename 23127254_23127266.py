@@ -1,5 +1,4 @@
 import sys
-import heapq
 from queue import Queue, PriorityQueue
 from dataclasses import dataclass
 
@@ -33,6 +32,7 @@ R2_process = []
 TT = [0] * 4
 WT = [0] * 4
 
+################ Utility function 
 def read_file(input):
     global process_list
     quantum_time = 0
@@ -79,7 +79,24 @@ def AddingProcess(queue, time, ReEnterProcess = None):
             if p not in queue_list:
                 queue.put(p)
                 queue_list.append(p)
-              
+
+def AddingProcessPQ(pqueue, time, ReEnterProcess = None):
+    enterRQ_list = []
+    pqueue_list = list(pqueue.queue)
+    for p in process_list:
+        if time == p.AT:
+            enterRQ_list.append(p)
+    
+    if ReEnterProcess:
+        for p in ReEnterProcess:
+            enterRQ_list.append(p) 
+               
+    if enterRQ_list:
+        enterRQ_list.sort(key=lambda p: (p.last_executed_time, p.ID))
+        for process in enterRQ_list:
+            if not any(p[1] == process for p in pqueue_list):
+                pqueue.put((process.remaining_time, process))       
+                  
 def rProcess(time):
     global R1, R2
     ReEnterProcess = []
@@ -122,6 +139,34 @@ def rProcess(time):
         
     return ReEnterProcess, ReEnterTime
 
+def calcTT(np):
+    global TT 
+    for i in range(np):
+        TT[i] = process_list[i].completion_time - process_list[i].AT
+
+def calcWT_Queue(q):
+    global WT
+    queue_list = list(q.queue)
+    for p in queue_list:
+        WT[p.ID - 1] += 1
+        
+def calcWT_PQueue(pq):
+    global WT
+    queue_list = list(pq.queue)
+    for p in queue_list:
+        WT[p[1].ID - 1] += 1
+        
+        
+def write_file(output, np):
+    with open(output, "w") as f:
+        f.write(" ".join(scheduling_process) + "\n")  
+        f.write(" ".join(map(str, R1_process)) + "\n")
+        f.write(" ".join(map(str,R2_process)) + "\n")
+        f.write(" ".join(map(str,TT[:np])) + "\n")
+        f.write(" ".join(map(str, WT[:np])) + "\n")
+################
+
+################ FCFS      
 def executeCPU_FCFS(q, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, ReEnterTime):
     CPU = getattr(curr_Process, cpu_attr)
 
@@ -130,11 +175,11 @@ def executeCPU_FCFS(q, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, Re
         if ReEnterProcess is not None and time == ReEnterTime:
             AddingProcess(q, time, ReEnterProcess)
         elif i !=  CPU - 1: AddingProcess(q, time)
+        
         if i != CPU - 1:
             calcWT_Queue(q)
             ReEnterProcess, ReEnterTime = rProcess(time)
             
-    
     curr_Process.burst_time += CPU 
     curr_Process.last_executed_time = time
     
@@ -176,12 +221,11 @@ def fcfs(np):
             scheduling_process.append("_")  # Nếu hiện tại không có quá trình nào thì append _
             time += 1 
             if ReEnterProcess is not None and time == ReEnterTime:
-                AddingProcess(q, time, ReEnterProcess)
-            
+                AddingProcess(q, time, ReEnterProcess)       
     calcTT(np)
+################
 
-
-##### RoundRobin
+################ RoundRobin
 def executeCPU_RR(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnterProcess, ReEnterTime):
     CPU = getattr(curr_Process, cpu_attr)
     temp = min(CPU, quantum_time)
@@ -191,6 +235,7 @@ def executeCPU_RR(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnte
         if ReEnterProcess is not None and time == ReEnterTime:
             AddingProcess(q, time, ReEnterProcess)
         elif i != temp - 1: AddingProcess(q, time)
+        
         if i != temp - 1:
             calcWT_Queue(q)
             ReEnterProcess, ReEnterTime = rProcess(time)
@@ -243,27 +288,9 @@ def roundRobin(quantum_time, np):
                 AddingProcess(q, time, ReEnterProcess)
             
     calcTT(np)
-#################
+################
          
-#####SJF
-def AddingProcessSJF(pq, time, ReEnterProcess = None):
-    enterRQ_list = []
-    pqueue_list = list(pq.queue)
-    for p in process_list:
-        if time == p.AT:
-            enterRQ_list.append(p)
-    
-    if ReEnterProcess:
-        for p in ReEnterProcess:
-            enterRQ_list.append(p) 
-               
-    if enterRQ_list:
-        enterRQ_list.sort(key=lambda p: (p.last_executed_time, p.ID))
-        for process in enterRQ_list:
-            if not any(p[1] == process for p in pqueue_list):
-                pq.put((process.remaining_time, process))  
-                #dung chung ham lun a ba :)) da cam on:))
-
+################ SJF
     
 def executeCPU_SJF(pq, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, ReEnterTime):
     CPU = getattr(curr_Process, cpu_attr)
@@ -271,9 +298,9 @@ def executeCPU_SJF(pq, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, Re
     for i in range(CPU):
         time += 1
         if ReEnterProcess is not None and time == ReEnterTime:
-            AddingProcessSJF(pq, time, ReEnterProcess)
+            AddingProcessPQ(pq, time, ReEnterProcess)
         elif i != CPU - 1:
-            AddingProcessSJF(pq, time)
+            AddingProcessPQ(pq, time)
         if i != CPU - 1:
             calcWT_PQueue(pq)
             ReEnterProcess, ReEnterTime = rProcess(time)
@@ -303,10 +330,10 @@ def sjf(np):
     
     while completed < np or not R1.empty() or not R2.empty():
         ReEnterProcess, ReEnterTime = rProcess(time)
-        AddingProcessSJF(pq, time)
+        AddingProcessPQ(pq, time)
     
         if not pq.empty(): 
-            _, curr_Process = pq.get() #t dung PriorityQueue 
+            _, curr_Process = pq.get()
             calcWT_PQueue(pq)
         
             if curr_Process.CPU1 > 0:
@@ -324,34 +351,18 @@ def sjf(np):
             scheduling_process.append("_")
             time += 1 
             if ReEnterProcess is not None and time == ReEnterTime:
-                AddingProcessSJF(pq, time, ReEnterProcess)
+                AddingProcessPQ(pq, time, ReEnterProcess)
             
     calcTT(np)
-            
+################           
     
 
-####### SRTN
-def AddingProcessSRTN(pqueue, time, ReEnterProcess = None):
-    enterRQ_list = []
-    pqueue_list = list(pqueue.queue)
-    for p in process_list:
-        if time == p.AT:
-            enterRQ_list.append(p)
-    
-    if ReEnterProcess:
-        for p in ReEnterProcess:
-            enterRQ_list.append(p) 
-               
-    if enterRQ_list:
-        enterRQ_list.sort(key=lambda p: (p.last_executed_time, p.ID))
-        for process in enterRQ_list:
-            if not any(p[1] == process for p in pqueue_list):
-                pqueue.put((process.remaining_time, process))       
+################ SRTN
                 
 def executeCPU_SRTN(pq, time, curr_Process, cpu_attr, io_attr):
     curr_Process.burst_time += 1
     setattr(curr_Process, cpu_attr, getattr(curr_Process, cpu_attr) - 1)
-    curr_Process.remaining_time = getattr(curr_Process, cpu_attr) - 1
+    curr_Process.remaining_time = getattr(curr_Process, cpu_attr)
     time += 1
     curr_Process.last_executed_time = time
     
@@ -366,7 +377,7 @@ def executeCPU_SRTN(pq, time, curr_Process, cpu_attr, io_attr):
         else: curr_Process.completion_time = time
         # Đánh dấu xem tiến trình hiện tại có IO lần đầu tiên hay chưa
         setattr(curr_Process, cpu_attr, -1)
-    else: AddingProcessSRTN(pq, time, [curr_Process])
+    else: AddingProcessPQ(pq, time, [curr_Process])
     
 def srtn(np):
     global R1, R2, scheduling_process
@@ -375,7 +386,7 @@ def srtn(np):
     pq = PriorityQueue()
     while completed < np or not R1.empty() or not R2.empty():
         ReEnterProcess , ReEnterTime = rProcess(time)
-        AddingProcessSRTN(pq, time)
+        AddingProcessPQ(pq, time)
         if not pq.empty():
             _, curr_Process = pq.get()
             calcWT_PQueue(pq)
@@ -386,7 +397,7 @@ def srtn(np):
 
             time += 1
             if ReEnterProcess and time == ReEnterTime:
-                AddingProcessSRTN(pq, time, ReEnterProcess) 
+                AddingProcessPQ(pq, time, ReEnterProcess) 
  
             if curr_Process.CPU1 == -1 and curr_Process.CPU2 == -1: #nếu xong
                 completed += 1
@@ -396,47 +407,18 @@ def srtn(np):
             scheduling_process.append("_")  # Nếu hiện tại không có quá trình nào thì append _
             time += 1 
             if ReEnterProcess and time == ReEnterTime:
-                AddingProcessSRTN(pq, time, ReEnterProcess)
+                AddingProcessPQ(pq, time, ReEnterProcess)
             
     calcTT(np)
-#################   
-    
-def calcTT(np):
-    global TT 
-    for i in range(np):
-        TT[i] = process_list[i].completion_time - process_list[i].AT
-
-def calcWT_Queue(q):
-    global WT
-    queue_list = list(q.queue)
-    for p in queue_list:
-        WT[p.ID - 1] += 1
-        
-def calcWT_PQueue(pq):
-    global WT
-    queue_list = list(pq.queue)
-    for p in queue_list:
-        WT[p[1].ID - 1] += 1
-        
-        
-def write_file(output, np):
-    with open(output, "w") as f:
-        f.write(" ".join(scheduling_process) + "\n")  
-        f.write(" ".join(map(str, R1_process)) + "\n")
-        f.write(" ".join(map(str,R2_process)) + "\n")
-        f.write(" ".join(map(str,TT[:np])) + "\n")
-        f.write(" ".join(map(str, WT[:np])) + "\n")
-        
+################   
     
 def main():
-    # if len(sys.argv) != 3:
-    #     print("Usage: python 23127254_23127366.py <INPUT_FILE> <OUTPUT_FILE>")
-    #     sys.exit(1)
+    if len(sys.argv) != 3:
+        print("Usage: python 23127254_23127366.py <INPUT_FILE> <OUTPUT_FILE>")
+        sys.exit(1)
     
-    # input_file = sys.argv[1]
-    # output_file = sys.argv[2]
-    input_file = "Input.txt"
-    output_file = "Output.txt"
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
     
     algorithm, quantum_time, np = read_file(input_file)
     match algorithm:
