@@ -54,7 +54,7 @@ def read_file(input):
                 IO2 = temp[4]
                 IO_time += 1
             else: IO2 = "-1"
-            process_list.append(Process(i + 1, AT, CPU1, IO1, CPU2, IO2, 0, IO_time, CPU1, 0))
+            process_list.append(Process(i + 1, AT, CPU1, IO1, CPU2, IO2, AT, IO_time, CPU1, 0))
                                     #ID, AT, CPU1, IO1, CPU2, IO2, last_executed_time, IO_Time, remaning_time, completion_time
     return algorithm, quantum_time, np
 
