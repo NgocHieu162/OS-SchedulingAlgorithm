@@ -15,7 +15,6 @@ class Process:
     CPU2: int
     IO2: str
     last_executed_time: int
-    burst_time: int
     IO_time: int
     remaining_time: int
     completion_time: int
@@ -55,8 +54,8 @@ def read_file(input):
                 IO2 = temp[4]
                 IO_time += 1
             else: IO2 = "-1"
-            process_list.append(Process(i + 1, AT, CPU1, IO1, CPU2, IO2, 0, 0, IO_time, CPU1, 0))
-                                                                                        #first remaning_time = CPU1
+            process_list.append(Process(i + 1, AT, CPU1, IO1, CPU2, IO2, 0, IO_time, CPU1, 0))
+                                    #ID, AT, CPU1, IO1, CPU2, IO2, last_executed_time, IO_Time, remaning_time, completion_time
     return algorithm, quantum_time, np
 
 def AddingProcess(queue, time, ReEnterProcess = None):
@@ -180,10 +179,7 @@ def executeCPU_FCFS(q, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, Re
             calcWT_Queue(q)
             ReEnterProcess, ReEnterTime = rProcess(time)
             
-    curr_Process.burst_time += CPU 
     curr_Process.last_executed_time = time
-    
-    setattr(curr_Process, cpu_attr, 0)
 
     io_data = getattr(curr_Process, io_attr)
     if io_data != "-1":
@@ -193,8 +189,8 @@ def executeCPU_FCFS(q, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, Re
         else:
             R2.put([curr_Process, io_time])
     else: curr_Process.completion_time = time
+    
     setattr(curr_Process, cpu_attr, -1)  # Đánh dấu là đã xong
-
     return CPU 
             
 def fcfs(np):
@@ -208,6 +204,7 @@ def fcfs(np):
         if not q.empty():
             curr_Process = q.get()
             calcWT_Queue(q)
+            
             if curr_Process.CPU1 > 0:
                 temp = executeCPU_FCFS(q, time, curr_Process, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
             elif curr_Process.CPU2 > 0:
@@ -216,6 +213,7 @@ def fcfs(np):
             
             if curr_Process.CPU1 == -1 and curr_Process.CPU2 == -1: #nếu xong
                 completed += 1
+                
             scheduling_process.extend(str(curr_Process.ID) * temp)
         else:
             scheduling_process.append("_")  # Nếu hiện tại không có quá trình nào thì append _
@@ -240,10 +238,7 @@ def executeCPU_RR(q, time, curr_Process, quantum_time, cpu_attr, io_attr, ReEnte
             calcWT_Queue(q)
             ReEnterProcess, ReEnterTime = rProcess(time)
             
-    
-    curr_Process.burst_time += temp
     curr_Process.last_executed_time = time
-    
     setattr(curr_Process, cpu_attr, CPU - temp)
 
     if getattr(curr_Process, cpu_attr) == 0:
@@ -272,6 +267,7 @@ def roundRobin(quantum_time, np):
         if not q.empty():
             curr_Process = q.get()
             calcWT_Queue(q)
+            
             if curr_Process.CPU1 > 0:
                 temp = executeCPU_RR(q, time, curr_Process, quantum_time, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
             elif curr_Process.CPU2 > 0:
@@ -280,13 +276,13 @@ def roundRobin(quantum_time, np):
             
             if curr_Process.CPU1 == -1 and curr_Process.CPU2 == -1: #nếu xong
                 completed += 1
+                
             scheduling_process.extend(str(curr_Process.ID) * temp)
         else:
             scheduling_process.append("_")  # Nếu hiện tại không có quá trình nào thì append _
             time += 1 
             if ReEnterProcess is not None and time == ReEnterTime:
-                AddingProcess(q, time, ReEnterProcess)
-            
+                AddingProcess(q, time, ReEnterProcess)        
     calcTT(np)
 ################
          
@@ -304,10 +300,8 @@ def executeCPU_SJF(pq, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, Re
         if i != CPU - 1:
             calcWT_PQueue(pq)
             ReEnterProcess, ReEnterTime = rProcess(time)
-    
-    curr_Process.burst_time += CPU
+
     curr_Process.last_excuted_time = time
-    setattr(curr_Process, cpu_attr, 0)
     
     io_data = getattr(curr_Process, io_attr)
     if io_data != "-1":
@@ -331,16 +325,14 @@ def sjf(np):
     while completed < np or not R1.empty() or not R2.empty():
         ReEnterProcess, ReEnterTime = rProcess(time)
         AddingProcessPQ(pq, time)
-    
         if not pq.empty(): 
             _, curr_Process = pq.get()
             calcWT_PQueue(pq)
-        
+            
             if curr_Process.CPU1 > 0:
                 temp = executeCPU_SJF(pq, time, curr_Process, "CPU1", "IO1", ReEnterProcess, ReEnterTime)
             elif curr_Process.CPU2 > 0:
-                temp = executeCPU_SJF(pq, time, curr_Process, "CPU2", "IO2", ReEnterProcess, ReEnterTime)
-                    
+                temp = executeCPU_SJF(pq, time, curr_Process, "CPU2", "IO2", ReEnterProcess, ReEnterTime)      
             time += temp
         
             if curr_Process.CPU1 == -1 and curr_Process.CPU2 == -1:
@@ -360,7 +352,6 @@ def sjf(np):
 ################ SRTN
                 
 def executeCPU_SRTN(pq, time, curr_Process, cpu_attr, io_attr):
-    curr_Process.burst_time += 1
     setattr(curr_Process, cpu_attr, getattr(curr_Process, cpu_attr) - 1)
     curr_Process.remaining_time = getattr(curr_Process, cpu_attr)
     time += 1
@@ -390,11 +381,12 @@ def srtn(np):
         if not pq.empty():
             _, curr_Process = pq.get()
             calcWT_PQueue(pq)
+            
             if curr_Process.CPU1 > 0:
                 executeCPU_SRTN(pq, time, curr_Process, "CPU1", "IO1")
             elif curr_Process.CPU2 > 0:
                 executeCPU_SRTN(pq, time, curr_Process, "CPU2", "IO2")
-
+                
             time += 1
             if ReEnterProcess and time == ReEnterTime:
                 AddingProcessPQ(pq, time, ReEnterProcess) 
