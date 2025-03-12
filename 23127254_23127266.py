@@ -301,7 +301,7 @@ def executeCPU_SJF(pq, time, curr_Process, cpu_attr, io_attr, ReEnterProcess, Re
             calcWT_PQueue(pq)
             ReEnterProcess, ReEnterTime = rProcess(time)
 
-    curr_Process.last_excuted_time = time
+    curr_Process.last_executed_time = time
     
     io_data = getattr(curr_Process, io_attr)
     if io_data != "-1":
